@@ -45,8 +45,7 @@ async def transcribe(req: ReelRequest):
         with open(audio_path, "rb") as f:
             result = client.audio.transcriptions.create(
                 model="whisper-1",
-                file=f,
-                task="translate"
+                file=f
             )
 
     return {"transcript": result.text}
