@@ -15,18 +15,28 @@ class ReelRequest(BaseModel):
 async def transcribe(req: ReelRequest):
     with tempfile.TemporaryDirectory() as tmpdir:
         audio_path = os.path.join(tmpdir, "audio.mp3")
+        cookies_path = None
+
+        # Write cookies from env variable if available
+        cookies_content = os.environ.get("INSTAGRAM_COOKIES")
+        if cookies_content:
+            cookies_path = os.path.join(tmpdir, "cookies.txt")
+            with open(cookies_path, "w") as f:
+                f.write(cookies_content)
+
+        cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "-o", audio_path]
+        if cookies_path:
+            cmd += ["--cookies", cookies_path]
+        cmd.append(req.url)
+
         try:
-            subprocess.run(
-                ["yt-dlp", "-x", "--audio-format", "mp3", "-o", audio_path, req.url],
-                check=True, capture_output=True, timeout=120
-            )
+            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
         except subprocess.CalledProcessError as e:
             raise HTTPException(status_code=400, detail=f"Download failed: {e.stderr.decode()}")
         except subprocess.TimeoutExpired:
             raise HTTPException(status_code=408, detail="Download timed out")
 
         if not os.path.exists(audio_path):
-            # yt-dlp sometimes appends extension
             matches = [f for f in os.listdir(tmpdir) if f.startswith("audio")]
             if not matches:
                 raise HTTPException(status_code=400, detail="Audio file not found after download")
